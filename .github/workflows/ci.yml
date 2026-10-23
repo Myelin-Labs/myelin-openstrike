@@ -1,9 +1,7 @@
-name: CI
+name: Upstream desktop CI (manual)
 
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -35,8 +33,10 @@ jobs:
       # cargo invocation, so the recursive submodule checkout is required
       # even for default-feature builds.
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
+      - name: Required engine submodules
+        run: |
+          git submodule update --init vendor/open-strike
+          git -C vendor/open-strike submodule update --init vendor/pocketjs
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
@@ -72,8 +72,10 @@ jobs:
             args: --features openstrike
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
+      - name: Required engine submodules
+        run: |
+          git submodule update --init vendor/open-strike
+          git -C vendor/open-strike submodule update --init vendor/pocketjs
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -86,8 +88,10 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
+      - name: Required engine submodules
+        run: |
+          git submodule update --init vendor/open-strike
+          git -C vendor/open-strike submodule update --init vendor/pocketjs
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Install desktop build dependencies
@@ -117,8 +121,10 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
+      - name: Required engine submodules
+        run: |
+          git submodule update --init vendor/open-strike
+          git -C vendor/open-strike submodule update --init vendor/pocketjs
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       # The script asserts on log output with ripgrep, which is not part of

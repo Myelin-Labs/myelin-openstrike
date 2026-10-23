@@ -12,3 +12,13 @@
 /assets/maps/
 /assets/support/
 /shots/
+
+# Myelin browser deployment
+release/
+web-src/node_modules/
+service/node_modules/
+service/data/
+myelin/target/
+artifacts/
+
+target-portable/

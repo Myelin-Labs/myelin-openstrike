@@ -1,0 +1,251 @@
+# OpenStrike Fiber Arena
+
+[![CI](https://github.com/RetricSu/openstrike-fiber-arena/actions/workflows/ci.yml/badge.svg)](https://github.com/RetricSu/openstrike-fiber-arena/actions/workflows/ci.yml)
+
+Native-desktop 1v1 multiplayer and event-driven Fiber payments for
+[OpenStrike](https://github.com/pocket-stack/open-strike).
+
+The project keeps two networks deliberately separate:
+
+- Renet carries latency-sensitive player input and authoritative snapshots.
+- Fiber pre-locks signed hold invoices and settles them when authoritative game
+  events release server-generated preimages.
+
+The server defaults to a tiny deterministic arena so networking and payment
+behavior can be tested without copyrighted BSP/WAD files. With the `openstrike`
+feature and a map path, the same server runs a symmetric duel using OpenStrike's
+player/weapon logic and Pocket3D's BSP collision and character movement.
+
+**New here?** See [docs/development.md](docs/development.md) for the
+quickstart (a full match in three terminals), the build/feature matrix, and
+a five-minute explanation of the mechanism.
+
+## Download and play
+
+[Releases](https://github.com/RetricSu/openstrike-fiber-arena/releases)
+ship pre-built binaries for Linux (x86_64), Windows (x86_64), and macOS
+(Apple Silicon) — pick the archive for your platform, extract it, and play a
+local match against a bot with no Rust toolchain:
+
+```sh
+# one command per terminal; append .exe on Windows
+./arena-server --dev-unsecure --dev-signing-key
+./arena-client --name bot --dev-unsecure --mock-payments --auto-fire --exit-on-end
+./arena-desktop --name you --dev-unsecure --mock-payments --dev-arena
+```
+
+[docs/playing.md](docs/playing.md) covers platform notes (macOS quarantine,
+Windows SmartScreen, Linux GPU drivers), LAN play, and the move to real
+Fiber payments. Releases are built by
+[`.github/workflows/release.yml`](.github/workflows/release.yml) whenever a
+`v*` tag is pushed.
+
+## MVP contract
+
+- Two players, one authoritative server, 64 simulation ticks per second.
+- Damage is decided only by the server.
+- Before play, each payee creates hold invoices for server-generated SHA-256
+  hashes. The payer's own FNN parses and validates each signed invoice—including
+  its match reservation, expiry parameters, amount, hash, and bound pubkey—then
+  commits it; play starts only after every invoice reaches `Received`.
+- A configurable damage bucket releases one signed preimage to the payee, whose
+  local FNN calls `settle_invoice`. The victim cannot refuse after taking damage.
+- The default cap is four 1,000-shannon invoices per player (100 HP / 25 damage).
+- Unused invoices are cancelled at match end; the payer also configures a
+  bounded FNN payment timeout.
+- Fiber channels stay open across matches. Only channel opening/closing touches
+  CKB L1.
+- Production mode requires short-lived encrypted Netcode connect tokens and a
+  file-backed Ed25519 settlement signing key. Insecure defaults are never
+  selected implicitly.
+
+## Development commands
+
+```sh
+cargo fmt --check
+cargo test
+cargo test --features openstrike
+cargo run --bin arena-server -- --dev-unsecure --dev-signing-key
+cargo run --bin arena-client -- --name alice --dev-unsecure --mock-payments
+cargo run --bin arena-client -- --name bob --dev-unsecure --mock-payments
+./scripts/smoke-local.sh
+```
+
+The native client reuses Pocket3D's wgpu/winit renderer, BSP loading, and
+first person input. It adds local movement prediction, authoritative
+reconciliation, remote-player interpolation, and the same Fiber spending
+guard used by the headless client.
+
+## Invite-code rooms
+
+`arena-matchmaker` is a small HTTP room service for public developer demos.
+The first player creates an eight-character room code; the second joins that
+code. Their names, fixed A/B seats, and real local FNN identity pubkeys are
+bound into short-lived encrypted Netcode tokens. A third player gets an
+explicit `409 room_full` response and never reaches the game UDP socket.
+
+Each full room reserves one preconfigured UDP endpoint and starts an isolated
+`arena-server` child. The endpoint is recycled when the match ends, a player
+forfeits by disconnecting, or the room TTL expires. The HTTP service never
+receives a wallet key or calls a player's FNN. `--mock-payments` is rejected
+when a client uses `--matchmaker`.
+
+Player A creates a room and prints its code:
+
+```sh
+cargo run --features desktop --bin arena-desktop -- \
+  --name alice --matchmaker https://arena.example.com \
+  --fiber-rpc http://127.0.0.1:8227 --dev-arena
+```
+
+Player B uses the shared code:
+
+```sh
+cargo run --features desktop --bin arena-desktop -- \
+  --name bob --matchmaker https://arena.example.com --room ABCD2345 \
+  --fiber-rpc http://127.0.0.1:8227 --dev-arena
+```
+
+Both FNNs still need reusable outbound liquidity to the opponent. The existing
+client-side channel check and hold-invoice handshake run after the room is
+ready and before gameplay begins.
+
+See [docs/public-matchmaking.md](docs/public-matchmaking.md) for the HTTP API,
+UDP endpoint pool, Cloudflare/Playit split, Bear deployment, lifecycle, and
+security boundaries.
+
+## Built-in neon arena
+
+With `--dev-arena` the game needs no external assets at all: it ships an
+original "neon duel arena" look that is generated entirely in code.
+
+- **Duelist** (`assets/models/duelist.glb`): a low-poly skinned character
+  with Idle/Walk/Run/Death clips, generated by
+  `cargo run --features openstrike --bin build-duelist` (skeleton, mesh,
+  palette texture, and animations are all procedural — no third-party art).
+  Neon accents are authored white and pick up the team tint (A cyan, B
+  orange). `--soldier-model` still overrides the character model.
+- **Arena** (`src/devmap.rs` + `src/neon.rs`): a symmetric 1v1 layout — twin
+  gate pillars at mid with a duel-line slot, waist-high cover, flank crates,
+  and corner pylons under a night sky. The same obstacle list drives server
+  hitscan, client prediction, and rendering, so visible cover blocks players
+  and bullets identically on both sides.
+- **Presentation**: neon rifle with view-model sway/bob/reload dip and
+  team-tinted tracers and muzzle flashes, plus a HUD with health/ammo bars,
+  hit markers, damage vignette, phase banners, and Fiber settlement
+  floaters.
+
+Headless screenshots (no window or display required; handy for CI and art
+iteration):
+
+```sh
+cargo run --features desktop --bin arena-shot -- --out shots/arena
+```
+
+An asset-free two-window smoke test is included. It opens real native GPU
+windows and also exercises production Renet authentication:
+
+```sh
+./scripts/smoke-secure-desktop.sh
+```
+
+To run the authoritative OpenStrike simulation with a locally owned GoldSrc
+map and its WAD search directory:
+
+```sh
+cargo run --features desktop --bin arena-server -- \
+  --dev-unsecure --dev-signing-key \
+  --map /path/to/map.bsp --wad-dir /path/to/wads
+
+cargo run --features desktop --bin arena-desktop -- \
+  --name alice --dev-unsecure --mock-payments \
+  --map /path/to/map.bsp --wad-dir /path/to/wads
+```
+
+### Internal `de_dust2` test setup
+
+The local internal-test copy is kept under `work/maps/cs16/`, which is ignored
+by Git because Counter-Strike BSP/WAD data is Valve-owned and is not part of
+this project's source distribution. On a machine where those assets have been
+prepared, open three terminals:
+
+```sh
+./scripts/run-internal-map-local.sh server
+./scripts/run-internal-map-local.sh alice
+./scripts/run-internal-map-local.sh bob
+```
+
+The bear deployment accepts the same local assets and copies them into a
+timestamped runtime directory outside the source sync:
+
+```sh
+./scripts/run-bear-server.sh \
+  --map work/maps/cs16/maps/de_dust2.bsp \
+  --wad-dir work/maps/cs16/support
+```
+
+The deployment command prints fresh secure client commands and token paths.
+
+## Secure deployment bootstrap
+
+Generate two independent server secrets. Private files are created with mode
+`0600` and the server rejects keys or bearer tokens readable by group/others:
+
+```sh
+cargo run --bin arena-admin -- keygen --out-dir ./secrets
+```
+
+After matchmaking authorizes a player, issue a short-lived connect token. The
+encrypted token fixes the player name, A/B seat, FNN v0.9.0-rc7 identity pubkey,
+unique client id, server address, expiry, and per-connection encryption keys:
+
+```sh
+cargo run --bin arena-admin -- issue-token \
+  --netcode-key ./secrets/netcode.key \
+  --server 203.0.113.10:5000 --name alice \
+  --slot a --fiber-pubkey 02... \
+  --output ./alice.token
+```
+
+Start the server and client without any development flags:
+
+```sh
+cargo run --features desktop --bin arena-server -- \
+  --bind 0.0.0.0:5000 --public-addr 203.0.113.10:5000 \
+  --netcode-key ./secrets/netcode.key \
+  --signing-key-file ./secrets/signing.key \
+  --map /path/to/map.bsp --wad-dir /path/to/wads
+
+cargo run --features desktop --bin arena-desktop -- \
+  --name alice --connect-token ./alice.token \
+  --fiber-rpc http://127.0.0.1:8227 --fiber-currency Fibt \
+  --map /path/to/map.bsp --wad-dir /path/to/wads
+```
+
+`arena-admin issue-token` is the issuer primitive. In a deployed product it
+belongs behind an authenticated matchmaking API; the Netcode private key must
+never be shipped to game clients.
+
+Real Fiber mode targets FNN `v0.9.0-rc7`. The opponent pubkey comes only from
+the authenticated match binding; there is no client `--peer-pubkey` override.
+Do not expose a Fiber node's RPC endpoint to the public internet.
+
+Check a local FNN and its direct outbound channel before starting a funded
+match:
+
+```sh
+cargo run --bin fiber-probe -- \
+  --fiber-rpc http://127.0.0.1:8227 \
+  --peer-pubkey 03... --required-outbound 4000
+```
+
+See [docs/fiber-integration.md](docs/fiber-integration.md) for the verified
+FNN v0.9.0-rc7 flow, funded test prerequisites, trust boundary, and limitations.
+
+`vendor/open-strike` is pinned as a recursive git submodule. Cargo resolves
+those path dependencies on every invocation, so clone this project with
+`--recursive`, or run `git submodule update --init --recursive` before any
+`cargo` command — not just builds with `--features openstrike`.
+
+See [docs/architecture.md](docs/architecture.md) for the trust model and wire
+flow.

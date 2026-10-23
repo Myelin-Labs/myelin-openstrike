@@ -1,0 +1,1 @@
+{"name":"myelin-openstrike-web","version":"0.1.0","private":true,"type":"module","scripts":{"build":"esbuild main.js --bundle --minify --format=esm --outfile=../web/app.js"},"dependencies":{"esbuild":"0.28.2","three":"0.186.1"}}

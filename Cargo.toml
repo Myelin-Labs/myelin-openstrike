@@ -59,3 +59,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dev-dependencies]
 approx = "0.5"
+
+[[bin]]
+name = "myelin-arena-bridge"
+path = "src/bin/myelin-arena-bridge.rs"
+required-features = ["openstrike"]

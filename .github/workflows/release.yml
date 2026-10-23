@@ -5,7 +5,7 @@ name: Release
 # Release, so players can download and run the game without a Rust toolchain.
 on:
   push:
-    tags: ["v*"]
+    tags: ["upstream-desktop-v*"]
 
 permissions:
   contents: write
