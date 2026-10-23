@@ -53,3 +53,7 @@ OPENSTRIKE_ASSETS="$PWD/release" release/myelin-openstrike record ./private-sess
 ```
 
 [Protocol and integration guide](docs/DEVELOPERS.md) · [Architecture](docs/ARCHITECTURE.md) · [Attribution](NOTICE.md)
+
+### Browser performance
+
+Static arena boxes are instanced by material and obstacle outlines are merged. The render loop reuses vectors, deduplicates HUD updates, and separates prediction from transmitted input sequence numbers. Active play renders at up to 120 Hz, menus at 30 Hz, and hidden documents stop drawing. Adaptive resolution and bounded outbound buffering reduce overload; the native 64 Hz simulation and replay rules are unchanged. `web-src/performance.mjs` shares the UTXOPlay presentation scheduler; run `npm run build --prefix web-src` to rebuild the shipped client.
