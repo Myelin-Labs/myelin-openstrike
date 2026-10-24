@@ -1,1 +1,12 @@
-{"name":"myelin-openstrike-service","version":"0.1.0","private":true,"type":"module","scripts":{"start":"node server.mjs"},"dependencies":{"ws":"8.22.0"}}
+{
+  "name": "myelin-openstrike-service",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "ws": "8.22.0"
+  }
+}

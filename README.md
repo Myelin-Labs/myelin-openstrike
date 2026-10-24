@@ -2,7 +2,7 @@
 
 A free, browser-playable port of [RetricSu's OpenStrike Fiber Arena](https://github.com/RetricSu/openstrike-fiber-arena), published by Myelin Labs for [UTXOPlay](https://store.utxoplay.io/play/openstrike).
 
-**Play:** practice against a bot or create a private 1v1 room. WASD moves, mouse aims, left click fires, Shift walks, R reloads, and Escape opens the menu. First elimination wins; an uneventful round ends after 90 seconds. The original procedural arena is flat and has no jumping. Desktop keyboard and mouse are recommended; touch controls are included.
+**Play:** practice against a Rookie, Standard or Veteran bot or create a private 1v1 room. WASD moves, mouse aims, left click fires, Shift walks, R reloads, and Escape opens the menu. First elimination wins; an uneventful round ends after 90 seconds. The original procedural arena is flat and has no jumping. Desktop keyboard and mouse are recommended; touch controls are included.
 
 The browser uses a new Three.js renderer. Gameplay runs in the original Rust `OpenStrikeDuelSim`, with its actual movement, collision, hit detection, health, weapon cooldowns and ammunition. We do **not** use the upstream network-test `HarnessSim` for this port. No Valve maps, textures, models, or Counter-Strike binaries are included.
 
@@ -57,3 +57,11 @@ OPENSTRIKE_ASSETS="$PWD/release" release/myelin-openstrike record ./private-sess
 ### Browser performance
 
 Static arena boxes are instanced by material and obstacle outlines are merged. The render loop reuses vectors, deduplicates HUD updates, and separates prediction from transmitted input sequence numbers. Active play renders at up to 120 Hz, menus at 30 Hz, and hidden documents stop drawing. Adaptive resolution and bounded outbound buffering reduce overload; the native 64 Hz simulation and replay rules are unchanged. `web-src/performance.mjs` shares the UTXOPlay presentation scheduler; run `npm run build --prefix web-src` to rebuild the shipped client.
+
+### Sunlit Harbor service update
+
+The UTXOPlay production client is maintained in `Myelin-Labs/UTXOPlay/games/openstrike/client`; its original generated textures, custom harbor models and image prompts are documented in that repository's `games/openstrike/ART.md`. This repository retains the standalone renderer.
+
+Service 0.2.0 adds three bot input policies with line-of-sight checks, obstacle routing, burst control and different reaction/aim settings. These policies generate ordinary native inputs; they do not change the simulation or application profile. Both production native binaries are retained byte-for-byte, so existing exports retain their verifier identity. The service also persists shots, hits and damage summaries from native frames. These statistics are presentation metadata, not additional signed evidence.
+
+Run `node --test tests/practice.mjs` for navigation and input policy checks. Run `tests/openstrike-practice-flow.mjs` from UTXOPlay against an isolated real-native stack for all three difficulty levels, persisted statistics and rematches.
